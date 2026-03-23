@@ -24,14 +24,8 @@ export const menuConfig = [
     children: [
       {
         text: "My Documents",
-        path: "/documents/mine",
+        path: "/documents/",
         icon: "FolderKanban",
-        page: "Documents",
-      },
-      {
-        text: "Shared with Me",
-        path: "/documents/shared",
-        icon: "Share2",
         page: "Documents",
       },
       {

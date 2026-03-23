@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(node -e \"const l = require\\(''c:/Users/JGVILLANUEVA/OneDrive - HIJO Resources Corporation/Masteral Files/Personal/DMS - MONTEVISTA/DMS-Montevista/node_modules/lucide-react''\\); console.log\\(''UserPen'' in l, ''UserCog'' in l, ''UserRoundPen'' in l\\);\")"
     ]
   }
 }

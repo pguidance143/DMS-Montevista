@@ -1,8 +1,10 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
+import UserRegistration from "./pages/UserRegistration";
 import MainLayout from "./components/Layout/MainLayout";
 import { UserProvider } from "./components/common/UserContext";
+import { ToastProvider } from "./components/common/ToastContext";
 
 const PrivateRoute = ({ children }) => {
   const isLoggedIn = localStorage.getItem("isLoggedIn") === "true";
@@ -10,6 +12,7 @@ const PrivateRoute = ({ children }) => {
 };
 
 const App = () => (
+  <ToastProvider>
   <UserProvider>
     <Routes>
       <Route path="/" element={<Navigate to="/login" replace />} />
@@ -24,10 +27,11 @@ const App = () => (
         }
       >
         <Route path="/dashboard" element={<Dashboard />} />
-        {/* Add more protected routes here as pages are built */}
+        <Route path="/usermanagement/registration" element={<UserRegistration />} />
       </Route>
     </Routes>
   </UserProvider>
+  </ToastProvider>
 );
 
 export default App;

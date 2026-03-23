@@ -9,9 +9,11 @@ app.use(express.json());
 
 // Routers
 const loginRoutes = require("./src/login/routes");
+const usersRoutes = require("./src/users/routes");
 
 // API Endpoints
 app.use("/api/v1", loginRoutes);
+app.use("/api/v1/users", usersRoutes);
 
 app.listen(port, () => {
   console.log(`App listening on port ${port}`);
