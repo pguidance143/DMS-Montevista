@@ -29,6 +29,9 @@ import {
   ShieldCheck,
   Lock,
   ScrollText,
+  FilePlus,
+  Layers,
+  Network,
 } from "lucide-react";
 
 const ICON_MAP = {
@@ -56,6 +59,9 @@ const ICON_MAP = {
   ShieldCheck,
   Lock,
   ScrollText,
+  FilePlus,
+  Layers,
+  Network,
 };
 
 const getIcon = (name) => {

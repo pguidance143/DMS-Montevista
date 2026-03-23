@@ -3,6 +3,9 @@ import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import UserRegistration from "./pages/UserRegistration";
 import MainLayout from "./components/Layout/MainLayout";
+import AddNewDocument from "./pages/documents/AddNewDocument";
+import DocumentSector from "./pages/documents/DocumentSector";
+import DocumentSubsector from "./pages/documents/DocumentSubsector";
 import { UserProvider } from "./components/common/UserContext";
 import { ToastProvider } from "./components/common/ToastContext";
 
@@ -13,24 +16,30 @@ const PrivateRoute = ({ children }) => {
 
 const App = () => (
   <ToastProvider>
-  <UserProvider>
-    <Routes>
-      <Route path="/" element={<Navigate to="/login" replace />} />
-      <Route path="/login" element={<Login />} />
+    <UserProvider>
+      <Routes>
+        <Route path="/" element={<Navigate to="/login" replace />} />
+        <Route path="/login" element={<Login />} />
 
-      {/* Protected layout — all authenticated pages go here */}
-      <Route
-        element={
-          <PrivateRoute>
-            <MainLayout />
-          </PrivateRoute>
-        }
-      >
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/usermanagement/registration" element={<UserRegistration />} />
-      </Route>
-    </Routes>
-  </UserProvider>
+        {/* Protected layout — all authenticated pages go here */}
+        <Route
+          element={
+            <PrivateRoute>
+              <MainLayout />
+            </PrivateRoute>
+          }
+        >
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route
+            path="/usermanagement/registration"
+            element={<UserRegistration />}
+          />
+          <Route path="/documents/new" element={<AddNewDocument />} />
+          <Route path="/documents/sector" element={<DocumentSector />} />
+          <Route path="/documents/subsector" element={<DocumentSubsector />} />
+        </Route>
+      </Routes>
+    </UserProvider>
   </ToastProvider>
 );
 

@@ -40,6 +40,24 @@ export const menuConfig = [
         icon: "Archive",
         page: "Documents",
       },
+      {
+        text: "Add New Document",
+        path: "/documents/new",
+        icon: "FilePlus",
+        page: "Documents",
+      },
+      {
+        text: "Document Sector",
+        path: "/documents/sector",
+        icon: "Layers",
+        page: "Documents",
+      },
+      {
+        text: "Document Subsector",
+        path: "/documents/subsector",
+        icon: "Network",
+        page: "Documents",
+      },
     ],
   },
 
