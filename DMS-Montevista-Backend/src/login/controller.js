@@ -1,6 +1,7 @@
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const { getUserByUsername, updateDeviceId } = require("./queries");
+const { log } = require("../utils/logger");
 
 const login = async (req, res) => {
   const { username, password, deviceId } = req.body;
@@ -39,6 +40,16 @@ const login = async (req, res) => {
       process.env.JWT_SECRET,
       { expiresIn: "8h" },
     );
+
+    await log({
+      user_id:     user.user_id,
+      username:    user.username,
+      action:      "LOGIN",
+      entity_type: "system",
+      entity_name: "Authentication",
+      details:     `User logged in from device ${deviceId || "unknown"}`,
+      ip_address:  req.ip,
+    });
 
     res.json({
       token,

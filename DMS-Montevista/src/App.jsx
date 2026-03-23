@@ -2,6 +2,9 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import UserRegistration from "./pages/UserRegistration";
+import RoleManagement from "./pages/RoleManagement";
+import PasswordManagement from "./pages/PasswordManagement";
+import UserActivityLog from "./pages/UserActivityLog";
 import MainLayout from "./components/Layout/MainLayout";
 import { UserProvider } from "./components/common/UserContext";
 import { ToastProvider } from "./components/common/ToastContext";
@@ -28,6 +31,9 @@ const App = () => (
       >
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/usermanagement/registration" element={<UserRegistration />} />
+        <Route path="/usermanagement/roles" element={<RoleManagement />} />
+        <Route path="/usermanagement/password" element={<PasswordManagement />} />
+        <Route path="/usermanagement/activitylog" element={<UserActivityLog />} />
       </Route>
     </Routes>
   </UserProvider>
