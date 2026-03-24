@@ -2,7 +2,7 @@ const pool = require("../../db");
 
 const getUsers = async ({ search = "", limit = 10, offset = 0 }) => {
   const result = await pool.query(
-    `SELECT user_id, username, full_name, email, role_id, department_id, created_at
+    `SELECT user_id, username, full_name, email, role_id, department_id, created_at, updated_at
      FROM users
      WHERE username ILIKE $1 OR full_name ILIKE $1 OR email ILIKE $1
      ORDER BY created_at DESC
@@ -54,4 +54,11 @@ const getUserById = async (userId) => {
   return result.rows[0];
 };
 
-module.exports = { getUsers, getUsersCount, createUser, updateUser, deleteUser, getUserById };
+const resetPassword = async (userId, password_hash) => {
+  await pool.query(
+    "UPDATE users SET password_hash = $1, updated_at = CURRENT_TIMESTAMP WHERE user_id = $2",
+    [password_hash, userId]
+  );
+};
+
+module.exports = { getUsers, getUsersCount, createUser, updateUser, deleteUser, getUserById, resetPassword };

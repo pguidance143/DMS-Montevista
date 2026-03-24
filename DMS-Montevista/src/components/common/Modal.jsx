@@ -7,6 +7,7 @@ const Modal = ({ open, onClose, title, icon: Icon, children, footer, size = "md"
     md: "max-w-md",
     lg: "max-w-lg",
     xl: "max-w-2xl",
+    "2xl": "max-w-3xl",
   };
 
 

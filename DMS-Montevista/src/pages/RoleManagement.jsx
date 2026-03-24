@@ -1,43 +1,35 @@
 import { useState, useEffect, useCallback } from "react";
 import api from "../api/axiosInstance";
-import { UserPlus, Pencil, Trash2, Users } from "lucide-react";
+import { ShieldPlus, Pencil, Trash2, ShieldCheck } from "lucide-react";
 import SearchBar from "../components/common/SearchBar";
 import ActionButton from "../components/common/ActionButton";
 import DataTable from "../components/common/DataTable";
 import Pagination from "../components/common/Pagination";
-import UserFormModal from "../components/UserManagement/UserFormModal";
-import UserDeleteModal from "../components/UserManagement/UserDeleteModal";
+import RoleFormModal from "../components/RoleManagement/RoleFormModal";
+import ConfirmModal from "../components/common/ConfirmModal";
 import { useToast } from "../components/common/ToastContext";
 
-const API_BASE = "/users";
-
-const ROLES = [
-  { id: 1, label: "Admin" },
-  { id: 2, label: "Staff" },
-  { id: 3, label: "Public User" },
-];
-
-const roleLabel = (id) => ROLES.find((r) => r.id === id)?.label ?? "—";
+const API_BASE = "/roles";
 
 const EMPTY_FORM = {
-  full_name: "",
-  username: "",
-  email: "",
-  password: "",
-  role_id: "",
-  department_id: "",
+  role_name: "",
+  description: "",
+  is_active: true,
+  page_ids: [],
 };
 
-export default function UserRegistration() {
+export default function RoleManagement() {
   const toast = useToast();
 
-  const [users, setUsers]           = useState([]);
+  const [roles, setRoles]           = useState([]);
   const [total, setTotal]           = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [page, setPage]             = useState(1);
   const [limit, setLimit]           = useState(10);
   const [search, setSearch]         = useState("");
   const [loading, setLoading]       = useState(false);
+
+  const [pages, setPages]           = useState([]);
 
   const [modalOpen, setModalOpen]   = useState(false);
   const [editTarget, setEditTarget] = useState(null);
@@ -48,24 +40,27 @@ export default function UserRegistration() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting]         = useState(false);
 
-  // ── Fetch ────────────────────────────────────────────────
-  const fetchUsers = useCallback(async () => {
+  // ── Fetch pages list once ─────────────────────────────────
+  useEffect(() => {
+    api.get(`${API_BASE}/pages`).then(({ data }) => setPages(data)).catch(() => {});
+  }, []);
+
+  // ── Fetch roles ───────────────────────────────────────────
+  const fetchRoles = useCallback(async () => {
     setLoading(true);
     try {
-      const { data } = await api.get(API_BASE, {
-        params: { search, page, limit },
-      });
-      setUsers(data.data);
+      const { data } = await api.get(API_BASE, { params: { search, page, limit } });
+      setRoles(data.data);
       setTotal(data.total);
       setTotalPages(data.totalPages);
     } catch {
-      // silently fail — table shows empty
+      // silently fail
     } finally {
       setLoading(false);
     }
   }, [search, page, limit]);
 
-  useEffect(() => { fetchUsers(); }, [fetchUsers]);
+  useEffect(() => { fetchRoles(); }, [fetchRoles]);
   useEffect(() => { setPage(1); }, [search, limit]);
 
   // ── Helpers ──────────────────────────────────────────────
@@ -76,15 +71,13 @@ export default function UserRegistration() {
     setModalOpen(true);
   };
 
-  const openEdit = (user) => {
-    setEditTarget(user);
+  const openEdit = (role) => {
+    setEditTarget(role);
     setForm({
-      full_name:     user.full_name,
-      username:      user.username,
-      email:         user.email,
-      password:      "",
-      role_id:       user.role_id ?? "",
-      department_id: user.department_id ?? "",
+      role_name:   role.role_name,
+      description: role.description || "",
+      is_active:   role.is_active,
+      page_ids:    role.page_ids || [],
     });
     setFormError("");
     setModalOpen(true);
@@ -100,24 +93,14 @@ export default function UserRegistration() {
     setSaving(true);
     try {
       if (editTarget) {
-        await api.put(`${API_BASE}/${editTarget.user_id}`, {
-          full_name:     form.full_name,
-          username:      form.username,
-          email:         form.email,
-          role_id:       form.role_id || null,
-          department_id: form.department_id || null,
-        });
-        toast.success(`${form.full_name} has been updated successfully.`);
+        await api.put(`${API_BASE}/${editTarget.role_id}`, form);
+        toast.success(`Role "${form.role_name}" has been updated.`);
       } else {
-        await api.post(API_BASE, {
-          ...form,
-          role_id:       form.role_id || null,
-          department_id: form.department_id || null,
-        });
-        toast.success(`${form.full_name} has been registered successfully.`);
+        await api.post(API_BASE, form);
+        toast.success(`Role "${form.role_name}" has been created.`);
       }
       closeModal();
-      fetchUsers();
+      fetchRoles();
     } catch (err) {
       setFormError(err.response?.data?.message || "Something went wrong.");
     } finally {
@@ -129,10 +112,10 @@ export default function UserRegistration() {
   const handleDelete = async () => {
     setDeleting(true);
     try {
-      await api.delete(`${API_BASE}/${deleteTarget.user_id}`);
-      toast.success(`${deleteTarget.full_name} has been deleted.`);
+      await api.delete(`${API_BASE}/${deleteTarget.role_id}`);
+      toast.success(`Role "${deleteTarget.role_name}" has been deleted.`);
       setDeleteTarget(null);
-      fetchUsers();
+      fetchRoles();
     } catch (err) {
       toast.error(err.response?.data?.message || "Delete failed.");
     } finally {
@@ -148,17 +131,37 @@ export default function UserRegistration() {
       className: "w-12 text-gray-400",
       render: (_, i) => (page - 1) * limit + i + 1,
     },
-    { key: "full_name", header: "Full Name" },
-    { key: "username",  header: "Username" },
-    { key: "email",     header: "Email" },
+    { key: "role_name", header: "Role Name" },
     {
-      key: "role_id",
-      header: "Role",
-      render: (row) => (
-        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700">
-          {roleLabel(row.role_id)}
-        </span>
-      ),
+      key: "description",
+      header: "Description",
+      render: (row) => row.description || <span className="text-gray-300">—</span>,
+    },
+    {
+      key: "page_ids",
+      header: "Pages",
+      render: (row) => {
+        const count = (row.page_ids || []).length;
+        return (
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700">
+            {count} page{count !== 1 ? "s" : ""}
+          </span>
+        );
+      },
+    },
+    {
+      key: "is_active",
+      header: "Status",
+      render: (row) =>
+        row.is_active ? (
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-50 text-green-700">
+            Active
+          </span>
+        ) : (
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500">
+            Inactive
+          </span>
+        ),
     },
     {
       key: "created_at",
@@ -174,8 +177,8 @@ export default function UserRegistration() {
       className: "w-24",
       render: (row) => (
         <div className="flex items-center gap-1.5">
-          <ActionButton variant="secondary" size="sm" icon={Pencil} tooltip="Edit user" onClick={() => openEdit(row)} />
-          <ActionButton variant="danger" size="sm" icon={Trash2} tooltip="Delete user" onClick={() => setDeleteTarget(row)} />
+          <ActionButton variant="secondary" size="sm" icon={Pencil} tooltip="Edit role" onClick={() => openEdit(row)} />
+          <ActionButton variant="danger" size="sm" icon={Trash2} tooltip="Delete role" onClick={() => setDeleteTarget(row)} />
         </div>
       ),
     },
@@ -185,20 +188,20 @@ export default function UserRegistration() {
     <div className="p-6">
       <div className="mb-5 flex items-center gap-3">
         <div className="p-2 bg-blue-50 rounded-lg">
-          <Users className="w-5 h-5 text-blue-600" />
+          <ShieldCheck className="w-5 h-5 text-blue-600" />
         </div>
         <div>
-          <h1 className="text-lg font-semibold text-gray-800">User Registration</h1>
-          <p className="text-xs text-gray-400 mt-0.5">Manage system users and their access roles.</p>
+          <h1 className="text-lg font-semibold text-gray-800">Role Management</h1>
+          <p className="text-xs text-gray-400 mt-0.5">Define roles and their page access permissions.</p>
         </div>
       </div>
 
       <div className="flex items-center justify-between mb-4">
-        <SearchBar value={search} onChange={setSearch} placeholder="Search by name, username, email…" />
-        <ActionButton label="Add User" icon={UserPlus} tooltip="Register a new user" onClick={openAdd} />
+        <SearchBar value={search} onChange={setSearch} placeholder="Search by role name or description…" />
+        <ActionButton label="Add Role" icon={ShieldPlus} tooltip="Create a new role" onClick={openAdd} />
       </div>
 
-      <DataTable columns={columns} data={users} loading={loading} emptyMessage="No users found." />
+      <DataTable columns={columns} data={roles} loading={loading} emptyMessage="No roles found." />
 
       <Pagination
         page={page}
@@ -209,23 +212,32 @@ export default function UserRegistration() {
         onLimitChange={setLimit}
       />
 
-      <UserFormModal
+      <RoleFormModal
         open={modalOpen}
         onClose={closeModal}
         onSave={handleSave}
         form={form}
         onChange={handleFormChange}
+        pages={pages}
         editMode={!!editTarget}
         saving={saving}
         error={formError}
       />
 
-      <UserDeleteModal
+      <ConfirmModal
         open={!!deleteTarget}
         onClose={() => setDeleteTarget(null)}
         onConfirm={handleDelete}
-        user={deleteTarget}
-        deleting={deleting}
+        title="Delete Role"
+        message={
+          <>
+            Are you sure you want to delete{" "}
+            <span className="font-semibold text-gray-800">{deleteTarget?.role_name}</span>?
+            This action cannot be undone.
+          </>
+        }
+        confirmLabel="Delete"
+        loading={deleting}
       />
     </div>
   );

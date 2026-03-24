@@ -1,12 +1,10 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
+import api from "../api/axiosInstance";
 import InputField from "../components/Login/InputField";
 import { FaUser, FaLock } from "react-icons/fa";
 import Button from "../components/Login/Button";
 import { useUser } from "../components/common/UserContext";
-
-const API_URL = "http://localhost:50000/api/v1";
 
 const getDeviceId = () => {
   let deviceId = localStorage.getItem("deviceId");
@@ -47,7 +45,7 @@ const Login = () => {
     setHasError(false);
 
     try {
-      const response = await axios.post(`${API_URL}/login`, {
+      const response = await api.post("/login", {
         username: logincredentials.username,
         password: logincredentials.password,
         deviceId: getDeviceId(),
