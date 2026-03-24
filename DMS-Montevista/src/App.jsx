@@ -37,6 +37,20 @@ const App = () => (
             path="/usermanagement/registration"
             element={<UserRegistration />}
           />
+          <Route path="/usermanagement/roles" element={<RoleManagement />} />
+          <Route
+            path="/usermanagement/password"
+            element={<PasswordManagement />}
+          />
+          <Route
+            path="/usermanagement/activitylog"
+            element={<UserActivityLog />}
+          />
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route
+            path="/usermanagement/registration"
+            element={<UserRegistration />}
+          />
           <Route path="/documents/new" element={<AddNewDocument />} />
           <Route path="/documents/sector" element={<DocumentSector />} />
           <Route path="/documents/subsector" element={<DocumentSubsector />} />
