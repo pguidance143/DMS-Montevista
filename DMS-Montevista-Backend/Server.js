@@ -18,8 +18,6 @@ const subsectorRoutes = require("./src/subsector/routes");
 // API Endpoints
 app.use("/api/v1", loginRoutes);
 app.use("/api/v1/users", usersRoutes);
-app.use("/api/v1", loginRoutes);
-app.use("/api/v1/users", usersRoutes);
 app.use("/api/v1/roles", rolesRoutes);
 app.use("/api/v1/activitylog", activitylogRoutes);
 app.use("/api/v1/sectors", sectorRoutes);
