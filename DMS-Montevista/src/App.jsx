@@ -51,7 +51,7 @@ const App = () => (
             path="/usermanagement/registration"
             element={<UserRegistration />}
           />
-          <Route path="/documents/new" element={<AddNewDocument />} />
+          <Route path="/documents/all" element={<AddNewDocument />} />
           <Route path="/documents/sector" element={<DocumentSector />} />
           <Route path="/documents/subsector" element={<DocumentSubsector />} />
         </Route>

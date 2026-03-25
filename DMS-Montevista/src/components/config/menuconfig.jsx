@@ -28,21 +28,15 @@ export const menuConfig = [
         icon: "FolderKanban",
         page: "Documents",
       },
-      {
-        text: "All Documents",
-        path: "/documents/all",
-        icon: "List",
-        page: "All Documents",
-      },
-      {
+{
         text: "Archived",
         path: "/documents/archived",
         icon: "Archive",
         page: "Documents",
       },
       {
-        text: "Add New Document",
-        path: "/documents/new",
+        text: "All Documents",
+        path: "/documents/all",
         icon: "FilePlus",
         page: "Documents",
       },
