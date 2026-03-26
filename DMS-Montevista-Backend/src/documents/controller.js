@@ -5,12 +5,16 @@ const {
   createDocument,
   updateDocument,
   archiveDocument,
+  addDocumentFiles,
+  removeDocumentFile,
   setMembersPresent,
   setCommittees,
   getDocumentTypes,
   getSeriesYears,
 } = require("./queries");
 const { log } = require("../utils/logger");
+const { extractText } = require("../utils/extractor");
+const { parseDocument } = require("../utils/documentParser");
 
 // ── List documents ──────────────────────────────────────────
 const listDocuments = async (req, res) => {
@@ -58,15 +62,12 @@ const addDocument = async (req, res) => {
   }
 
   try {
-    const fileData = {};
-    if (req.file) {
-      fileData.file_name = req.file.originalname;
-      fileData.file_path = req.file.path;
-      fileData.file_type = req.file.mimetype;
-      fileData.file_size = req.file.size;
-    }
+    const doc = await createDocument(req.body);
 
-    const doc = await createDocument({ ...req.body, ...fileData });
+    // Save uploaded files
+    if (req.files && req.files.length) {
+      await addDocumentFiles(doc.document_id, req.files);
+    }
 
     // Save members present if provided
     if (req.body.members_present) {
@@ -112,15 +113,12 @@ const editDocument = async (req, res) => {
     const existing = await getDocumentById(id);
     if (!existing) return res.status(404).json({ message: "Document not found." });
 
-    const fileData = {};
-    if (req.file) {
-      fileData.file_name = req.file.originalname;
-      fileData.file_path = req.file.path;
-      fileData.file_type = req.file.mimetype;
-      fileData.file_size = req.file.size;
-    }
+    await updateDocument(id, req.body);
 
-    await updateDocument(id, { ...req.body, ...fileData });
+    // Add new uploaded files (append, don't replace)
+    if (req.files && req.files.length) {
+      await addDocumentFiles(id, req.files);
+    }
 
     // Update members present if provided
     if (req.body.members_present) {
@@ -149,6 +147,18 @@ const editDocument = async (req, res) => {
       return res.status(409).json({ message: "A document with this number and series year already exists for this type." });
     }
     console.error("Edit document error:", error);
+    res.status(500).json({ message: "Internal server error." });
+  }
+};
+
+// ── Remove a single file from a document ────────────────────
+const deleteDocumentFile = async (req, res) => {
+  try {
+    const removed = await removeDocumentFile(req.params.fileId);
+    if (!removed) return res.status(404).json({ message: "File not found." });
+    res.json({ message: "File removed." });
+  } catch (error) {
+    console.error("Delete file error:", error);
     res.status(500).json({ message: "Internal server error." });
   }
 };
@@ -199,12 +209,54 @@ const listSeriesYears = async (req, res) => {
   }
 };
 
+// ── Extract data from uploaded files ────────────────────────
+const extractDocument = async (req, res) => {
+  if (!req.files || !req.files.length) {
+    return res.status(400).json({ message: "No files uploaded." });
+  }
+
+  try {
+    // Extract text from all uploaded files and combine
+    const textParts = [];
+    for (const file of req.files) {
+      const text = await extractText(file.path, file.mimetype);
+      if (text) textParts.push(text);
+    }
+    const combinedText = textParts.join("\n\n");
+    const parsed = parseDocument(combinedText);
+
+    // Resolve document_type_id from parsed type name
+    if (parsed.document_type) {
+      const types = await getDocumentTypes();
+      const found = types.find(
+        (t) => t.type_name.toLowerCase() === parsed.document_type.toLowerCase()
+      );
+      if (found) parsed.document_type_id = found.id;
+    }
+
+    res.json({
+      extracted: parsed,
+      files: req.files.map((f) => ({
+        name: f.originalname,
+        path: f.path,
+        type: f.mimetype,
+        size: f.size,
+      })),
+    });
+  } catch (error) {
+    console.error("Extract document error:", error);
+    res.status(500).json({ message: "Failed to extract document data." });
+  }
+};
+
 module.exports = {
   listDocuments,
   getDocument,
   addDocument,
   editDocument,
   removeDocument,
+  deleteDocumentFile,
   listDocumentTypes,
   listSeriesYears,
+  extractDocument,
 };

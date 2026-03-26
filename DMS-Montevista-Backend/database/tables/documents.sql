@@ -1,4 +1,15 @@
 -- ============================================================
+-- DROP old tables (reverse dependency order)
+-- Re-run this file to cleanly rebuild all document tables.
+-- ============================================================
+DROP TABLE IF EXISTS committee_members      CASCADE;
+DROP TABLE IF EXISTS document_committees    CASCADE;
+DROP TABLE IF EXISTS document_members_present CASCADE;
+DROP TABLE IF EXISTS document_files         CASCADE;
+DROP TABLE IF EXISTS documents              CASCADE;
+DROP TABLE IF EXISTS document_types         CASCADE;
+
+-- ============================================================
 -- Table: document_types
 -- Stores types of documents (Resolution, Ordinance, etc.)
 -- ============================================================
@@ -50,12 +61,6 @@ CREATE TABLE IF NOT EXISTS documents (
   content_text     TEXT,                         -- full extracted text for search
   description      TEXT,                         -- brief summary / notes
 
-  -- File info
-  file_name        VARCHAR(255),
-  file_path        VARCHAR(500),
-  file_type        VARCHAR(50),                  -- application/pdf, image/png, etc.
-  file_size        BIGINT,                       -- bytes
-
   -- Status & tracking
   status           VARCHAR(20)   NOT NULL DEFAULT 'active',  -- active, archived, draft
   uploaded_by      INTEGER       REFERENCES users(user_id) ON DELETE SET NULL,
@@ -73,6 +78,23 @@ CREATE INDEX IF NOT EXISTS idx_documents_series     ON documents (series_year);
 CREATE INDEX IF NOT EXISTS idx_documents_status     ON documents (status);
 CREATE INDEX IF NOT EXISTS idx_documents_created    ON documents (created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_documents_search     ON documents USING gin (to_tsvector('english', coalesce(title,'') || ' ' || coalesce(content_text,'') || ' ' || coalesce(description,'')));
+
+-- ============================================================
+-- Table: document_files
+-- Stores multiple uploaded files per document (pages/scans)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS document_files (
+  id           SERIAL       PRIMARY KEY,
+  document_id  INTEGER      NOT NULL REFERENCES documents(document_id) ON DELETE CASCADE,
+  file_name    VARCHAR(255) NOT NULL,
+  file_path    VARCHAR(500) NOT NULL,
+  file_type    VARCHAR(50),               -- application/pdf, image/png, etc.
+  file_size    BIGINT,                    -- bytes
+  file_order   INTEGER      DEFAULT 0,   -- display/page order
+  created_at   TIMESTAMP    DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_document_files_doc ON document_files (document_id);
 
 -- ============================================================
 -- Table: document_members_present

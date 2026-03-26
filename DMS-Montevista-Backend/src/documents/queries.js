@@ -32,7 +32,8 @@ const getDocuments = async ({ search = "", limit = 10, offset = 0, document_type
   const result = await pool.query(
     `SELECT d.*, dt.type_name,
             s.sector_name, sub.subsector_name,
-            u.full_name AS uploaded_by_name
+            u.full_name AS uploaded_by_name,
+            (SELECT COUNT(*) FROM document_files df WHERE df.document_id = d.document_id) AS file_count
      FROM documents d
      LEFT JOIN document_types dt ON dt.id = d.document_type_id
      LEFT JOIN sector s ON s.id = d.sector_id
@@ -97,6 +98,11 @@ const getDocumentById = async (id) => {
   );
   if (!doc.rows[0]) return null;
 
+  const files = await pool.query(
+    `SELECT * FROM document_files WHERE document_id = $1 ORDER BY file_order, id`,
+    [id]
+  );
+
   const members = await pool.query(
     `SELECT * FROM document_members_present WHERE document_id = $1 ORDER BY is_present DESC, member_name`,
     [id]
@@ -114,6 +120,7 @@ const getDocumentById = async (id) => {
 
   return {
     ...doc.rows[0],
+    files: files.rows,
     members_present: members.rows,
     committees: committees.rows,
   };
@@ -126,9 +133,8 @@ const createDocument = async (data) => {
        (document_type_id, sector_id, subsector_id, document_number, series_year,
         title, session_date, session_type, session_number,
         author, presiding_officer, attested_by, approved_by,
-        content_text, description, file_name, file_path, file_type, file_size,
-        status, uploaded_by)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
+        content_text, description, status, uploaded_by)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
      RETURNING *`,
     [
       data.document_type_id, data.sector_id || null, data.subsector_id || null,
@@ -137,7 +143,6 @@ const createDocument = async (data) => {
       data.author || null, data.presiding_officer || null,
       data.attested_by || null, data.approved_by || null,
       data.content_text || null, data.description || null,
-      data.file_name || null, data.file_path || null, data.file_type || null, data.file_size || null,
       data.status || "active", data.uploaded_by || null,
     ]
   );
@@ -153,10 +158,8 @@ const updateDocument = async (id, data) => {
        session_date = $7, session_type = $8, session_number = $9,
        author = $10, presiding_officer = $11, attested_by = $12, approved_by = $13,
        content_text = $14, description = $15,
-       file_name = COALESCE($16, file_name), file_path = COALESCE($17, file_path),
-       file_type = COALESCE($18, file_type), file_size = COALESCE($19, file_size),
-       status = $20, updated_at = CURRENT_TIMESTAMP
-     WHERE document_id = $21
+       status = $16, updated_at = CURRENT_TIMESTAMP
+     WHERE document_id = $17
      RETURNING *`,
     [
       data.document_type_id, data.sector_id || null, data.subsector_id || null,
@@ -165,7 +168,6 @@ const updateDocument = async (id, data) => {
       data.author || null, data.presiding_officer || null,
       data.attested_by || null, data.approved_by || null,
       data.content_text || null, data.description || null,
-      data.file_name || null, data.file_path || null, data.file_type || null, data.file_size || null,
       data.status || "active", id,
     ]
   );
@@ -178,6 +180,26 @@ const archiveDocument = async (id) => {
     `UPDATE documents SET status = 'archived', updated_at = CURRENT_TIMESTAMP WHERE document_id = $1`,
     [id]
   );
+};
+
+// ── Save document files ─────────────────────────────────────
+const addDocumentFiles = async (document_id, files) => {
+  for (let i = 0; i < files.length; i++) {
+    const f = files[i];
+    await pool.query(
+      `INSERT INTO document_files (document_id, file_name, file_path, file_type, file_size, file_order)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [document_id, f.originalname, f.path, f.mimetype, f.size, i]
+    );
+  }
+};
+
+const removeDocumentFile = async (fileId) => {
+  const result = await pool.query(
+    `DELETE FROM document_files WHERE id = $1 RETURNING *`,
+    [fileId]
+  );
+  return result.rows[0];
 };
 
 // ── Save members present ────────────────────────────────────
@@ -207,7 +229,6 @@ const setCommittees = async (document_id, committees) => {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
-    // Delete existing committees (cascades to committee_members)
     await client.query(
       `DELETE FROM document_committees WHERE document_id = $1`,
       [document_id]
@@ -262,6 +283,8 @@ module.exports = {
   createDocument,
   updateDocument,
   archiveDocument,
+  addDocumentFiles,
+  removeDocumentFile,
   setMembersPresent,
   setCommittees,
   getDocumentTypes,

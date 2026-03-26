@@ -7,8 +7,10 @@ const {
   addDocument,
   editDocument,
   removeDocument,
+  deleteDocumentFile,
   listDocumentTypes,
   listSeriesYears,
+  extractDocument,
 } = require("./controller");
 
 const router = Router();
@@ -37,16 +39,18 @@ const fileFilter = (req, file, cb) => {
 const upload = multer({
   storage,
   fileFilter,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB per file
 });
 
 // ── Routes ──────────────────────────────────────────────────
-router.get("/",           listDocuments);
-router.get("/types",      listDocumentTypes);
-router.get("/years",      listSeriesYears);
-router.get("/:id",        getDocument);
-router.post("/",          upload.single("file"), addDocument);
-router.put("/:id",        upload.single("file"), editDocument);
-router.delete("/:id",     removeDocument);
+router.get("/",               listDocuments);
+router.get("/types",          listDocumentTypes);
+router.get("/years",          listSeriesYears);
+router.post("/extract",      upload.array("files", 20), extractDocument);
+router.get("/:id",            getDocument);
+router.post("/",              upload.array("files", 20), addDocument);
+router.put("/:id",            upload.array("files", 20), editDocument);
+router.delete("/:id",         removeDocument);
+router.delete("/file/:fileId", deleteDocumentFile);
 
 module.exports = router;
