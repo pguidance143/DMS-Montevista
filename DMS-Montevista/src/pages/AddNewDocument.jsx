@@ -122,20 +122,32 @@ export default function AddNewDocument() {
   const handleSave = async (formData) => {
     setSaving(true);
     try {
+      const { files, removedFileIds, ...fields } = formData;
       const fd = new FormData();
-      Object.entries(formData).forEach(([key, val]) => {
-        if (key === "file") {
-          if (val) fd.append("file", val);
-        } else if (val !== "" && val !== null && val !== undefined) {
+
+      // Append form fields
+      Object.entries(fields).forEach(([key, val]) => {
+        if (val !== "" && val !== null && val !== undefined) {
           fd.append(key, val);
         }
       });
+
+      // Append multiple files
+      if (files && files.length) {
+        files.forEach((f) => fd.append("files", f));
+      }
 
       // Add uploaded_by from localStorage
       const user = JSON.parse(localStorage.getItem("user") || "{}");
       if (user.userId) fd.append("uploaded_by", user.userId);
 
       if (editData) {
+        // Delete removed files first
+        if (removedFileIds && removedFileIds.length) {
+          await Promise.all(
+            removedFileIds.map((id) => api.delete(`${DOC_API}/file/${id}`))
+          );
+        }
         await api.put(`${DOC_API}/${editData.document_id}`, fd, {
           headers: { "Content-Type": "multipart/form-data" },
         });
@@ -235,15 +247,19 @@ export default function AddNewDocument() {
       render: (row) => formatDate(row.session_date),
     },
     {
-      key: "file_name",
-      header: "File",
+      key: "file_count",
+      header: "Files",
       className: "w-16 text-center",
-      render: (row) =>
-        row.file_name ? (
-          <FileText className="w-4 h-4 text-red-400 mx-auto" />
+      render: (row) => {
+        const count = parseInt(row.file_count) || 0;
+        return count > 0 ? (
+          <span className="inline-flex items-center gap-1 text-xs font-medium text-blue-600">
+            <FileText className="w-3.5 h-3.5" /> {count}
+          </span>
         ) : (
           <span className="text-gray-300">—</span>
-        ),
+        );
+      },
     },
     {
       key: "actions",

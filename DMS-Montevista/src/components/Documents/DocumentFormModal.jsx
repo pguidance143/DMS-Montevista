@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
-import { FileText, UploadCloud, X, Image, Trash2, Plus } from "lucide-react";
+import { FileText, UploadCloud, X, Image, Loader2 } from "lucide-react";
+import api from "../../api/axiosInstance";
 import Modal from "../common/Modal";
 import ActionButton from "../common/ActionButton";
 
@@ -13,6 +14,14 @@ const formatSize = (bytes) => {
   if (!bytes) return "";
   if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   return `${(bytes / 1024).toFixed(0)} KB`;
+};
+
+const fileIcon = (file) => {
+  const name = file.name || file.file_name || "";
+  const type = file.type || file.file_type || "";
+  if (type === "application/pdf" || name.endsWith(".pdf"))
+    return <FileText className="w-4 h-4 text-red-500 shrink-0" />;
+  return <Image className="w-4 h-4 text-blue-500 shrink-0" />;
 };
 
 export default function DocumentFormModal({
@@ -46,9 +55,11 @@ export default function DocumentFormModal({
     content_text: "",
     description: "",
   });
-  const [file, setFile] = useState(null);
-  const [existingFile, setExistingFile] = useState(null);
+  const [newFiles, setNewFiles] = useState([]);        // File objects to upload
+  const [existingFiles, setExistingFiles] = useState([]); // Already saved files (edit mode)
+  const [removedFileIds, setRemovedFileIds] = useState([]); // IDs of files to delete
   const [error, setError] = useState("");
+  const [extracting, setExtracting] = useState(false);
 
   // ── Populate on edit ──────────────────────────────────────
   useEffect(() => {
@@ -70,8 +81,9 @@ export default function DocumentFormModal({
         content_text: editData.content_text || "",
         description: editData.description || "",
       });
-      setExistingFile(editData.file_name ? { name: editData.file_name, size: editData.file_size } : null);
-      setFile(null);
+      setExistingFiles(editData.files || []);
+      setNewFiles([]);
+      setRemovedFileIds([]);
     } else if (open) {
       setForm({
         document_type_id: "",
@@ -90,10 +102,12 @@ export default function DocumentFormModal({
         content_text: "",
         description: "",
       });
-      setFile(null);
-      setExistingFile(null);
+      setNewFiles([]);
+      setExistingFiles([]);
+      setRemovedFileIds([]);
     }
     setError("");
+    setExtracting(false);
   }, [open, editData]);
 
   const set = (key, val) => {
@@ -101,28 +115,90 @@ export default function DocumentFormModal({
     setError("");
   };
 
-  // ── File handling ─────────────────────────────────────────
-  const handleFile = (e) => {
-    const f = e.target.files[0];
-    if (!f) return;
+  // ── File handling + auto-extract ──────────────────────────
+  const handleFiles = async (incoming) => {
     const allowed = ["application/pdf", "image/jpeg", "image/png", "image/webp"];
-    if (!allowed.includes(f.type)) {
-      setError("Only PDF and image files are allowed.");
-      return;
+    const toAdd = [];
+
+    for (const f of Array.from(incoming)) {
+      if (!allowed.includes(f.type)) {
+        setError(`"${f.name}" is not a PDF or image.`);
+        continue;
+      }
+      if (f.size > 10 * 1024 * 1024) {
+        setError(`"${f.name}" exceeds the 10 MB limit.`);
+        continue;
+      }
+      // Skip duplicates
+      const alreadyAdded = newFiles.some((nf) => nf.name === f.name && nf.size === f.size);
+      const alreadyExists = existingFiles.some((ef) => ef.file_name === f.name);
+      if (!alreadyAdded && !alreadyExists) toAdd.push(f);
     }
-    if (f.size > 10 * 1024 * 1024) {
-      setError("File exceeds the 10 MB limit.");
-      return;
+
+    if (!toAdd.length) return;
+
+    const allNew = [...newFiles, ...toAdd];
+    setNewFiles(allNew);
+
+    // Auto-extract from ALL new files (only on first upload batch for add mode)
+    if (!isEdit && newFiles.length === 0) {
+      setExtracting(true);
+      try {
+        const fd = new FormData();
+        toAdd.forEach((f) => fd.append("files", f));
+        const { data } = await api.post("/documents/extract", fd, {
+          headers: { "Content-Type": "multipart/form-data" },
+          timeout: 120000,
+        });
+
+        if (data.extracted) {
+          const ext = data.extracted;
+          setForm((prev) => ({
+            ...prev,
+            document_type_id: ext.document_type_id || prev.document_type_id,
+            document_number: ext.document_number || prev.document_number,
+            series_year: ext.series_year || prev.series_year,
+            title: ext.title || prev.title,
+            session_date: ext.session_date || prev.session_date,
+            session_type: ext.session_type || prev.session_type,
+            session_number: ext.session_number || prev.session_number,
+            author: ext.author || prev.author,
+            presiding_officer: ext.presiding_officer || prev.presiding_officer,
+            attested_by: ext.attested_by || prev.attested_by,
+            approved_by: ext.approved_by || prev.approved_by,
+            content_text: ext.content_text || prev.content_text,
+          }));
+        }
+      } catch {
+        // Extraction failed — user can fill manually
+      } finally {
+        setExtracting(false);
+      }
     }
-    setFile(f);
-    setExistingFile(null);
-    setError("");
   };
 
-  const removeFile = () => {
-    setFile(null);
-    setExistingFile(null);
-    if (fileRef.current) fileRef.current.value = "";
+  const onInputChange = (e) => {
+    handleFiles(e.target.files);
+    e.target.value = "";
+  };
+
+  const removeNewFile = (idx) => {
+    setNewFiles((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  const removeExistingFile = (fileId) => {
+    setExistingFiles((prev) => prev.filter((f) => f.id !== fileId));
+    setRemovedFileIds((prev) => [...prev, fileId]);
+  };
+
+  // ── Drag handlers ─────────────────────────────────────────
+  const [dragging, setDragging] = useState(false);
+  const onDragOver = (e) => { e.preventDefault(); setDragging(true); };
+  const onDragLeave = () => setDragging(false);
+  const onDrop = (e) => {
+    e.preventDefault();
+    setDragging(false);
+    handleFiles(e.dataTransfer.files);
   };
 
   // ── Filtered subsectors ───────────────────────────────────
@@ -137,10 +213,10 @@ export default function DocumentFormModal({
     if (!form.series_year) return setError("Series year is required.");
     if (!form.title.trim()) return setError("Title is required.");
 
-    onSave({ ...form, file });
+    onSave({ ...form, files: newFiles, removedFileIds });
   };
 
-  const currentFile = file || existingFile;
+  const totalFiles = existingFiles.length + newFiles.length;
 
   return (
     <Modal
@@ -151,12 +227,106 @@ export default function DocumentFormModal({
       size="2xl"
       footer={
         <>
-          <ActionButton label="Cancel" variant="secondary" onClick={onClose} disabled={saving} />
-          <ActionButton label={saving ? "Saving…" : "Save Document"} onClick={handleSubmit} disabled={saving} />
+          <ActionButton label="Cancel" variant="secondary" onClick={onClose} disabled={saving || extracting} />
+          <ActionButton label={saving ? "Saving…" : "Save Document"} onClick={handleSubmit} disabled={saving || extracting} />
         </>
       }
     >
       <div className="space-y-4">
+        {/* ── File upload (first!) ──────────────────────────── */}
+        <div>
+          <label className={labelClass}>
+            Upload Document Files
+            {!isEdit && <span className="text-gray-400 font-normal ml-1">(auto-fills form fields)</span>}
+          </label>
+
+          {/* Drop zone */}
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={() => fileRef.current?.click()}
+            onKeyDown={(e) => e.key === "Enter" && fileRef.current?.click()}
+            onDragOver={onDragOver}
+            onDragLeave={onDragLeave}
+            onDrop={onDrop}
+            className={`flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed px-4 py-5 cursor-pointer transition-colors
+              ${dragging
+                ? "border-blue-400 bg-blue-50"
+                : "border-gray-200 bg-gray-50 hover:border-blue-300 hover:bg-blue-50/50"
+              }`}
+          >
+            <UploadCloud className={`w-6 h-6 ${dragging ? "text-blue-500" : "text-gray-400"}`} />
+            <p className="text-xs text-gray-500">
+              Drag & drop or click to upload PDF / images <span className="text-gray-400">(max 10 MB each)</span>
+            </p>
+            {!isEdit && (
+              <p className="text-xs text-blue-500 font-medium">
+                Data will be extracted automatically from uploaded files
+              </p>
+            )}
+          </div>
+          <input
+            ref={fileRef}
+            type="file"
+            multiple
+            accept=".pdf,image/*"
+            className="hidden"
+            onChange={onInputChange}
+          />
+
+          {/* Extracting indicator */}
+          {extracting && (
+            <div className="flex items-center gap-2 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2 mt-2">
+              <Loader2 className="w-4 h-4 text-blue-500 animate-spin shrink-0" />
+              <p className="text-xs text-blue-600">
+                Extracting document data… Fields will be auto-filled when done.
+              </p>
+            </div>
+          )}
+
+          {/* File list */}
+          {totalFiles > 0 && (
+            <ul className="mt-2 space-y-1.5">
+              {/* Existing files (edit mode) */}
+              {existingFiles.map((f) => (
+                <li key={`ex-${f.id}`} className="flex items-center gap-2 bg-white border border-gray-100 rounded-lg px-3 py-2">
+                  {fileIcon(f)}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium text-gray-800 truncate">{f.file_name}</p>
+                    <p className="text-xs text-gray-400">{formatSize(f.file_size)}</p>
+                  </div>
+                  <span className="text-xs text-green-500 font-medium mr-1">Saved</span>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); removeExistingFile(f.id); }}
+                    className="p-0.5 rounded text-gray-400 hover:text-red-500 hover:bg-red-50 transition"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </li>
+              ))}
+              {/* New files */}
+              {newFiles.map((f, i) => (
+                <li key={`new-${i}`} className="flex items-center gap-2 bg-white border border-gray-100 rounded-lg px-3 py-2">
+                  {fileIcon(f)}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium text-gray-800 truncate">{f.name}</p>
+                    <p className="text-xs text-gray-400">{formatSize(f.size)}</p>
+                  </div>
+                  <span className="text-xs text-blue-500 font-medium mr-1">New</span>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); removeNewFile(i); }}
+                    className="p-0.5 rounded text-gray-400 hover:text-red-500 hover:bg-red-50 transition"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
         {/* Row 1: Type, Number, Year */}
         <div className="grid grid-cols-3 gap-3">
           <div>
@@ -340,58 +510,9 @@ export default function DocumentFormModal({
           <textarea
             className={`${inputClass} resize-none`}
             rows={4}
-            placeholder="Paste the full document text here for search indexing…"
+            placeholder="Full document text for search indexing (auto-filled from upload)…"
             value={form.content_text}
             onChange={(e) => set("content_text", e.target.value)}
-          />
-        </div>
-
-        {/* File upload */}
-        <div>
-          <label className={labelClass}>Document File</label>
-          {currentFile ? (
-            <div className="flex items-center gap-3 bg-gray-50 border border-gray-200 rounded-lg px-4 py-2.5">
-              {file?.type === "application/pdf" || existingFile?.name?.endsWith(".pdf") ? (
-                <FileText className="w-5 h-5 text-red-500 shrink-0" />
-              ) : (
-                <Image className="w-5 h-5 text-blue-500 shrink-0" />
-              )}
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-800 truncate">
-                  {file?.name || existingFile?.name}
-                </p>
-                {(file?.size || existingFile?.size) && (
-                  <p className="text-xs text-gray-400">{formatSize(file?.size || existingFile?.size)}</p>
-                )}
-              </div>
-              <button
-                type="button"
-                onClick={removeFile}
-                className="p-1 rounded-md text-gray-400 hover:text-red-500 hover:bg-red-50 transition"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-          ) : (
-            <div
-              role="button"
-              tabIndex={0}
-              onClick={() => fileRef.current?.click()}
-              onKeyDown={(e) => e.key === "Enter" && fileRef.current?.click()}
-              className="flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-gray-200 bg-gray-50 px-4 py-6 cursor-pointer hover:border-blue-300 hover:bg-blue-50/50 transition-colors"
-            >
-              <UploadCloud className="w-6 h-6 text-gray-400" />
-              <p className="text-xs text-gray-500">
-                Click to upload PDF or image <span className="text-gray-400">(max 10 MB)</span>
-              </p>
-            </div>
-          )}
-          <input
-            ref={fileRef}
-            type="file"
-            accept=".pdf,image/*"
-            className="hidden"
-            onChange={handleFile}
           />
         </div>
 

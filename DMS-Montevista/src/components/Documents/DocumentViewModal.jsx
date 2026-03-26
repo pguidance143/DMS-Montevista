@@ -1,4 +1,4 @@
-import { FileText, Calendar, User, Building2, Download, ExternalLink } from "lucide-react";
+import { FileText, Download, ExternalLink, Image } from "lucide-react";
 import Modal from "../common/Modal";
 import ActionButton from "../common/ActionButton";
 
@@ -10,18 +10,28 @@ const Row = ({ label, value }) =>
     </div>
   ) : null;
 
-const Badge = ({ children, color = "blue" }) => (
-  <span className={`inline-block px-2 py-0.5 text-xs font-medium rounded-full bg-${color}-50 text-${color}-600`}>
-    {children}
-  </span>
-);
+const formatSize = (bytes) => {
+  if (!bytes) return "";
+  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(bytes / 1024).toFixed(0)} KB`;
+};
+
+const fileIcon = (f) => {
+  if (f.file_type === "application/pdf" || f.file_name?.endsWith(".pdf"))
+    return <FileText className="w-4 h-4 text-red-500 shrink-0" />;
+  return <Image className="w-4 h-4 text-blue-500 shrink-0" />;
+};
+
+const getFileUrl = (f) => {
+  if (!f.file_path) return null;
+  const filename = f.file_path.split(/[/\\]/).pop();
+  return `http://localhost:50000/uploads/${filename}`;
+};
 
 export default function DocumentViewModal({ open, onClose, document: doc }) {
   if (!doc) return null;
 
-  const fileUrl = doc.file_path
-    ? `http://localhost:50000/uploads/${doc.file_path.split(/[/\\]/).pop()}`
-    : null;
+  const files = doc.files || [];
 
   return (
     <Modal
@@ -31,17 +41,7 @@ export default function DocumentViewModal({ open, onClose, document: doc }) {
       icon={FileText}
       size="2xl"
       footer={
-        <>
-          {fileUrl && (
-            <ActionButton
-              label="View File"
-              icon={ExternalLink}
-              variant="secondary"
-              onClick={() => window.open(fileUrl, "_blank")}
-            />
-          )}
-          <ActionButton label="Close" variant="secondary" onClick={onClose} />
-        </>
+        <ActionButton label="Close" variant="secondary" onClick={onClose} />
       }
     >
       <div className="space-y-4">
@@ -101,34 +101,38 @@ export default function DocumentViewModal({ open, onClose, document: doc }) {
           </div>
         )}
 
-        {/* File info */}
-        {doc.file_name && (
-          <div className="flex items-center gap-3 bg-gray-50 border border-gray-200 rounded-lg px-4 py-2.5">
-            {doc.file_type === "application/pdf" ? (
-              <FileText className="w-5 h-5 text-red-500 shrink-0" />
-            ) : (
-              <FileText className="w-5 h-5 text-blue-500 shrink-0" />
-            )}
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-800 truncate">{doc.file_name}</p>
-              {doc.file_size && (
-                <p className="text-xs text-gray-400">
-                  {doc.file_size >= 1024 * 1024
-                    ? `${(doc.file_size / (1024 * 1024)).toFixed(1)} MB`
-                    : `${(doc.file_size / 1024).toFixed(0)} KB`}
-                </p>
-              )}
-            </div>
-            {fileUrl && (
-              <a
-                href={fileUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="p-1.5 rounded-md text-blue-500 hover:bg-blue-50 transition"
-              >
-                <Download className="w-4 h-4" />
-              </a>
-            )}
+        {/* Files */}
+        {files.length > 0 && (
+          <div>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
+              Attached Files ({files.length})
+            </p>
+            <ul className="space-y-1.5">
+              {files.map((f, i) => {
+                const url = getFileUrl(f);
+                return (
+                  <li key={f.id || i} className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+                    {fileIcon(f)}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-800 truncate">{f.file_name}</p>
+                      {f.file_size && (
+                        <p className="text-xs text-gray-400">{formatSize(f.file_size)}</p>
+                      )}
+                    </div>
+                    {url && (
+                      <a
+                        href={url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-blue-500 hover:bg-blue-50 rounded transition"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" /> View
+                      </a>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
           </div>
         )}
 
