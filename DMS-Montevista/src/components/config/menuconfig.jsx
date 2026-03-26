@@ -35,12 +35,6 @@ export const menuConfig = [
         page: "Documents",
       },
       {
-        text: "Add New Document",
-        path: "/documents/new",
-        icon: "FilePlus",
-        page: "Documents",
-      },
-      {
         text: "Document Sector",
         path: "/documents/sector",
         icon: "Layers",
