@@ -23,12 +23,6 @@ export const menuConfig = [
     page: null,
     children: [
       {
-        text: "My Documents",
-        path: "/documents/",
-        icon: "FolderKanban",
-        page: "Documents",
-      },
-      {
         text: "All Documents",
         path: "/documents/all",
         icon: "List",

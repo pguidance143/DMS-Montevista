@@ -1,16 +1,16 @@
 import { useState, useEffect, useCallback } from "react";
-import axios from "axios";
+import api from "../api/axiosInstance";
 import { Pencil, Trash2, Network } from "lucide-react";
-import SearchBar from "../../components/common/SearchBar";
-import ActionButton from "../../components/common/ActionButton";
-import DataTable from "../../components/common/DataTable";
-import Pagination from "../../components/common/Pagination";
-import Modal from "../../components/common/Modal";
-import ConfirmModal from "../../components/common/ConfirmModal";
-import { useToast } from "../../components/common/ToastContext";
+import SearchBar from "../components/common/SearchBar";
+import ActionButton from "../components/common/ActionButton";
+import DataTable from "../components/common/DataTable";
+import Pagination from "../components/common/Pagination";
+import Modal from "../components/common/Modal";
+import ConfirmModal from "../components/common/ConfirmModal";
+import { useToast } from "../components/common/ToastContext";
 
-const API_URL          = "http://localhost:50000/api/v1/subsectors";
-const SECTORS_API_URL  = "http://localhost:50000/api/v1/sectors";
+const API_BASE         = "/subsectors";
+const SECTORS_API_BASE = "/sectors";
 
 export default function DocumentSubsector() {
   const toast = useToast();
@@ -38,8 +38,8 @@ export default function DocumentSubsector() {
 
   // ── Fetch sector options for dropdown ────────────────────
   useEffect(() => {
-    axios
-      .get(SECTORS_API_URL, { params: { limit: 200 } })
+    api
+      .get(SECTORS_API_BASE, { params: { limit: 200 } })
       .then(({ data }) => setSectorOptions(data.data))
       .catch(() => {});
   }, []);
@@ -48,7 +48,7 @@ export default function DocumentSubsector() {
   const fetchSubsectors = useCallback(async () => {
     setLoading(true);
     try {
-      const { data } = await axios.get(API_URL, {
+      const { data } = await api.get(API_BASE, {
         params: { search, page, limit },
       });
       setSubsectors(data.data);
@@ -103,13 +103,13 @@ export default function DocumentSubsector() {
     setSaving(true);
     try {
       if (editTarget) {
-        await axios.put(`${API_URL}/${editTarget.id}`, {
+        await api.put(`${API_BASE}/${editTarget.id}`, {
           subsector_name: trimmed,
           sector_id: Number(sectorId),
         });
         toast.success(`"${trimmed}" has been updated.`);
       } else {
-        await axios.post(API_URL, {
+        await api.post(API_BASE, {
           subsector_name: trimmed,
           sector_id: Number(sectorId),
         });
@@ -133,7 +133,7 @@ export default function DocumentSubsector() {
   const handleDelete = async () => {
     setDeleting(true);
     try {
-      await axios.delete(`${API_URL}/${deleteTarget.id}`);
+      await api.delete(`${API_BASE}/${deleteTarget.id}`);
       toast.success(`"${deleteTarget.subsector_name}" has been deleted.`);
       setDeleteTarget(null);
       fetchSubsectors();

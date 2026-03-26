@@ -1,15 +1,15 @@
 import { useState, useEffect, useCallback } from "react";
-import axios from "axios";
+import api from "../api/axiosInstance";
 import { Pencil, Trash2, Layers } from "lucide-react";
-import SearchBar from "../../components/common/SearchBar";
-import ActionButton from "../../components/common/ActionButton";
-import DataTable from "../../components/common/DataTable";
-import Pagination from "../../components/common/Pagination";
-import Modal from "../../components/common/Modal";
-import ConfirmModal from "../../components/common/ConfirmModal";
-import { useToast } from "../../components/common/ToastContext";
+import SearchBar from "../components/common/SearchBar";
+import ActionButton from "../components/common/ActionButton";
+import DataTable from "../components/common/DataTable";
+import Pagination from "../components/common/Pagination";
+import Modal from "../components/common/Modal";
+import ConfirmModal from "../components/common/ConfirmModal";
+import { useToast } from "../components/common/ToastContext";
 
-const API_URL = "http://localhost:50000/api/v1/sectors";
+const API_BASE = "/sectors";
 
 export default function DocumentSector() {
   const toast = useToast();
@@ -35,7 +35,7 @@ export default function DocumentSector() {
   const fetchSectors = useCallback(async () => {
     setLoading(true);
     try {
-      const { data } = await axios.get(API_URL, {
+      const { data } = await api.get(API_BASE, {
         params: { search, page, limit },
       });
       setSectors(data.data);
@@ -82,10 +82,10 @@ export default function DocumentSector() {
     setSaving(true);
     try {
       if (editTarget) {
-        await axios.put(`${API_URL}/${editTarget.id}`, { sector_name: trimmed });
+        await api.put(`${API_BASE}/${editTarget.id}`, { sector_name: trimmed });
         toast.success(`"${trimmed}" has been updated.`);
       } else {
-        await axios.post(API_URL, { sector_name: trimmed });
+        await api.post(API_BASE, { sector_name: trimmed });
         toast.success(`"${trimmed}" has been added.`);
       }
       closeModal();
@@ -101,7 +101,7 @@ export default function DocumentSector() {
   const handleDelete = async () => {
     setDeleting(true);
     try {
-      await axios.delete(`${API_URL}/${deleteTarget.id}`);
+      await api.delete(`${API_BASE}/${deleteTarget.id}`);
       toast.success(`"${deleteTarget.sector_name}" has been deleted.`);
       setDeleteTarget(null);
       fetchSectors();

@@ -6,9 +6,9 @@ import RoleManagement from "./pages/RoleManagement";
 import PasswordManagement from "./pages/PasswordManagement";
 import UserActivityLog from "./pages/UserActivityLog";
 import MainLayout from "./components/Layout/MainLayout";
-import AddNewDocument from "./pages/documents/AddNewDocument";
-import DocumentSector from "./pages/documents/DocumentSector";
-import DocumentSubsector from "./pages/documents/DocumentSubsector";
+import AddNewDocument from "./pages/AddNewDocument";
+import DocumentSector from "./pages/DocumentSector";
+import DocumentSubsector from "./pages/DocumentSubsector";
 import { UserProvider } from "./components/common/UserContext";
 import { ToastProvider } from "./components/common/ToastContext";
 
@@ -45,11 +45,6 @@ const App = () => (
           <Route
             path="/usermanagement/activitylog"
             element={<UserActivityLog />}
-          />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route
-            path="/usermanagement/registration"
-            element={<UserRegistration />}
           />
           <Route path="/documents/new" element={<AddNewDocument />} />
           <Route path="/documents/sector" element={<DocumentSector />} />
