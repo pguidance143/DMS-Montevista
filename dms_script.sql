@@ -4,6 +4,12 @@
 -- ============================================================
 
 -- ── 0. DROP ORDER (respect FK dependencies) ─────────────────
+DROP TABLE IF EXISTS committee_members;
+DROP TABLE IF EXISTS document_committees;
+DROP TABLE IF EXISTS document_members_present;
+DROP TABLE IF EXISTS document_files;
+DROP TABLE IF EXISTS documents;
+DROP TABLE IF EXISTS document_types;
 DROP TABLE IF EXISTS activity_logs;
 DROP TABLE IF EXISTS role_pages;
 DROP TABLE IF EXISTS users;
@@ -73,7 +79,99 @@ CREATE INDEX IF NOT EXISTS idx_activity_logs_user_id   ON activity_logs (user_id
 CREATE INDEX IF NOT EXISTS idx_activity_logs_action     ON activity_logs (action);
 CREATE INDEX IF NOT EXISTS idx_activity_logs_created_at ON activity_logs (created_at DESC);
 
--- ── 6. SEED: PAGES ──────────────────────────────────────────
+-- ── 6. DOCUMENT TYPES TABLE ───────────────────────────────────
+CREATE TABLE IF NOT EXISTS document_types (
+    id        SERIAL       PRIMARY KEY,
+    type_name VARCHAR(100) UNIQUE NOT NULL,
+    status    BOOLEAN      NOT NULL DEFAULT TRUE
+);
+
+-- ── 7. DOCUMENTS TABLE ───────────────────────────────────────
+CREATE TABLE IF NOT EXISTS documents (
+    document_id      SERIAL        PRIMARY KEY,
+    document_type_id INTEGER       NOT NULL REFERENCES document_types(id),
+    sector_id        INTEGER       REFERENCES sector(id),
+    subsector_id     INTEGER       REFERENCES subsector(id),
+    document_number  VARCHAR(50)   NOT NULL,
+    series_year      INTEGER       NOT NULL,
+    title            TEXT          NOT NULL,
+    session_date     DATE,
+    session_type     VARCHAR(50),
+    session_number   VARCHAR(50),
+    author           VARCHAR(255),
+    presiding_officer VARCHAR(255),
+    attested_by      VARCHAR(255),
+    approved_by      VARCHAR(255),
+    content_text     TEXT,
+    description      TEXT,
+    status           VARCHAR(20)   NOT NULL DEFAULT 'active',
+    uploaded_by      INTEGER       REFERENCES users(user_id) ON DELETE SET NULL,
+    created_at       TIMESTAMP     DEFAULT CURRENT_TIMESTAMP,
+    updated_at       TIMESTAMP     DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (document_type_id, document_number, series_year)
+);
+
+CREATE INDEX IF NOT EXISTS idx_documents_type       ON documents (document_type_id);
+CREATE INDEX IF NOT EXISTS idx_documents_sector     ON documents (sector_id);
+CREATE INDEX IF NOT EXISTS idx_documents_series     ON documents (series_year);
+CREATE INDEX IF NOT EXISTS idx_documents_status     ON documents (status);
+CREATE INDEX IF NOT EXISTS idx_documents_created    ON documents (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_documents_search     ON documents USING gin (to_tsvector('english', coalesce(title,'') || ' ' || coalesce(content_text,'') || ' ' || coalesce(description,'')));
+
+-- ── 8. DOCUMENT FILES ─────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS document_files (
+    id           SERIAL       PRIMARY KEY,
+    document_id  INTEGER      NOT NULL REFERENCES documents(document_id) ON DELETE CASCADE,
+    file_name    VARCHAR(255) NOT NULL,
+    file_path    VARCHAR(500) NOT NULL,
+    file_type    VARCHAR(50),
+    file_size    BIGINT,
+    file_order   INTEGER      DEFAULT 0,
+    created_at   TIMESTAMP    DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_document_files_doc ON document_files (document_id);
+
+-- ── 9. DOCUMENT MEMBERS PRESENT ──────────────────────────────
+CREATE TABLE IF NOT EXISTS document_members_present (
+    id          SERIAL       PRIMARY KEY,
+    document_id INTEGER      NOT NULL REFERENCES documents(document_id) ON DELETE CASCADE,
+    member_name VARCHAR(255) NOT NULL,
+    position    VARCHAR(100),
+    is_present  BOOLEAN      NOT NULL DEFAULT TRUE,
+    UNIQUE (document_id, member_name)
+);
+
+-- ── 9. DOCUMENT COMMITTEES ───────────────────────────────────
+CREATE TABLE IF NOT EXISTS document_committees (
+    id             SERIAL       PRIMARY KEY,
+    document_id    INTEGER      NOT NULL REFERENCES documents(document_id) ON DELETE CASCADE,
+    committee_name VARCHAR(255) NOT NULL,
+    committee_order INTEGER     DEFAULT 0,
+    UNIQUE (document_id, committee_name)
+);
+
+-- ── 10. COMMITTEE MEMBERS ─────────────────────────────────────
+CREATE TABLE IF NOT EXISTS committee_members (
+    id             SERIAL       PRIMARY KEY,
+    committee_id   INTEGER      NOT NULL REFERENCES document_committees(id) ON DELETE CASCADE,
+    member_name    VARCHAR(255) NOT NULL,
+    role           VARCHAR(50)  NOT NULL DEFAULT 'Member',
+    UNIQUE (committee_id, member_name)
+);
+
+CREATE INDEX IF NOT EXISTS idx_committee_members_committee ON committee_members (committee_id);
+
+-- ── SEED: DOCUMENT TYPES ──────────────────────────────────────
+INSERT INTO document_types (type_name) VALUES
+    ('Resolution'),
+    ('Ordinance'),
+    ('Executive Order'),
+    ('Memorandum'),
+    ('Proclamation')
+ON CONFLICT (type_name) DO NOTHING;
+
+-- ── SEED: PAGES ──────────────────────────────────────────
 INSERT INTO pages (page_name, description) VALUES
     ('Documents',         'Access to personal and shared documents'),
     ('All Documents',     'View all documents across the system'),
